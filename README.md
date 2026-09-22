@@ -1,8 +1,8 @@
 # AI Task Extractor
 
-`ai-task-extractor` is a small, production-style learning project for Java backend developers taking their first step into AI Engineering. A client submits an unstructured task, an LLM turns it into a strongly typed Java record, and the application stores both the source text and extracted fields in MySQL.
+`ai-task-extractor` is a small, production-style full-stack learning project for Java backend developers taking their first step into AI Engineering. A user submits an unstructured task through a React web UI, an LLM turns it into a strongly typed Java record, and the application stores both the source text and extracted fields in MySQL.
 
-This repository intentionally stays small: one Spring Boot application, one AI use case, one database, and no frontend, authentication, vector database, RAG, agent loop, or microservices.
+This repository intentionally stays small: one Spring Boot application, one focused React UI, one AI use case, and one database. It has no authentication, vector database, RAG, agent loop, or microservices.
 
 ## What this project teaches
 
@@ -115,12 +115,14 @@ src/main/java/com/shokirjon/aitaskextractor/
 ├── ai/
 │   ├── config/AiConfiguration.java
 │   └── prompt/TaskExtractionPrompt.java
-├── common/exception/
-│   ├── AiProcessingException.java
-│   ├── ApiError.java
-│   ├── GlobalExceptionHandler.java
-│   ├── MalformedAiResponseException.java
-│   └── ResourceNotFoundException.java
+├── common/
+│   ├── config/WebConfig.java
+│   └── exception/
+│       ├── AiProcessingException.java
+│       ├── ApiError.java
+│       ├── GlobalExceptionHandler.java
+│       ├── MalformedAiResponseException.java
+│       └── ResourceNotFoundException.java
 └── task/
     ├── controller/TaskAnalysisController.java
     ├── dto/
@@ -143,6 +145,42 @@ Important supporting files:
 - `docker-compose.yml` — optional local MySQL only.
 - `.env.example` — configuration names with placeholder values.
 
+The web client lives in `frontend/`:
+
+```text
+frontend/
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── index.html
+├── .env.example
+└── src/
+    ├── api/
+    ├── components/
+    ├── styles/
+    ├── types/
+    ├── utils/
+    ├── App.tsx
+    └── main.tsx
+```
+
+## Web UI
+
+The `frontend/` application uses React 19.3, strict TypeScript, Vite 8, the native browser `fetch` API, and modern CSS. It provides one focused page for:
+
+- submitting natural-language task text;
+- viewing the structured AI result;
+- browsing paginated analysis history;
+- loading a saved analysis through the detail endpoint;
+- displaying validation, network, AI provider, and server errors safely.
+
+During local development, Vite serves the frontend from `http://localhost:5173`, while Spring Boot serves the API from `http://localhost:8080`. These are different **origins** because their ports differ. Browsers normally block cross-origin requests unless the API explicitly allows them.
+
+CORS (Cross-Origin Resource Sharing) is the backend policy that permits the frontend origin to call `/api/**`. `WebConfig` allows only configured origins, the `GET`, `POST`, and `OPTIONS` methods, and the headers this UI needs. Credentials are disabled because this project has no cookie-based authentication.
+
+- `VITE_API_BASE_URL` tells the browser where the Spring Boot API is available.
+- `APP_CORS_ALLOWED_ORIGINS` tells Spring Boot which frontend origins may call the API. It accepts comma-separated origins, for example `http://localhost:5173,http://192.168.1.10:5173`.
+
 ## Configuration
 
 Copy the placeholders from `.env.example` into your preferred environment-variable setup. Spring Boot does not automatically import a plain `.env` file; your shell, IDE run configuration, or another environment loader must export the values.
@@ -152,6 +190,7 @@ Copy the placeholders from `.env.example` into your preferred environment-variab
 | `OPENAI_API_KEY` | Yes | none | OpenAI credential; never commit it |
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | Chat model used for extraction |
 | `APP_TIME_ZONE` | No | `Asia/Tashkent` | Zone used to resolve relative deadlines |
+| `APP_CORS_ALLOWED_ORIGINS` | No | `http://localhost:5173` | Comma-separated frontend origins allowed to call `/api/**` |
 | `DB_HOST` | No | `localhost` | MySQL host |
 | `DB_PORT` | No | `3306` | MySQL port |
 | `DB_NAME` | No | `ai_task_extractor` | Database name |
@@ -163,15 +202,129 @@ Copy the placeholders from `.env.example` into your preferred environment-variab
 
 Hibernate uses `ddl-auto: validate`; Flyway owns schema creation and evolution.
 
-## Running locally
+The frontend has its own `frontend/.env.example` containing only:
 
-When you choose to run the project yourself:
+```dotenv
+VITE_API_BASE_URL=http://localhost:8080
+```
 
-1. Export secure environment values.
-2. Start a compatible MySQL instance. The included Compose file is only a convenience for MySQL.
-3. Start the Spring Boot application from your IDE or Maven.
+Vite exposes `VITE_*` values to browser code, so never put an OpenAI key or another secret in the frontend environment file.
 
-No OpenAI model is placed in Docker. The application calls the configured external provider.
+## Local Development
+
+These commands are for you to run manually. Prerequisites: Java 21, Maven, Docker, and a Node.js version supported by Vite 8 (`20.19+` or `22.12+`).
+
+### 1. Configure local MySQL values
+
+From the repository root, copy the backend environment example:
+
+```bash
+cp .env.example .env
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Replace the placeholder database passwords in `.env`. Docker Compose automatically reads this root `.env` file.
+
+### 2. Start MySQL
+
+```bash
+docker compose up -d
+```
+
+This starts only MySQL. OpenAI is not part of Docker Compose.
+
+### 3. Configure the backend terminal
+
+Spring Boot does not automatically import the root `.env` file. Export the required values in the terminal where you will start Maven.
+
+macOS/Linux:
+
+```bash
+export OPENAI_API_KEY="your-real-openai-api-key"
+export DB_PASSWORD="the-same-DB_PASSWORD-used-in-.env"
+export APP_TIME_ZONE="Asia/Tashkent"
+export APP_CORS_ALLOWED_ORIGINS="http://localhost:5173"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:OPENAI_API_KEY="your-real-openai-api-key"
+$env:DB_PASSWORD="the-same-DB_PASSWORD-used-in-.env"
+$env:APP_TIME_ZONE="Asia/Tashkent"
+$env:APP_CORS_ALLOWED_ORIGINS="http://localhost:5173"
+```
+
+`OPENAI_MODEL`, `DB_HOST`, `DB_PORT`, `DB_NAME`, and `DB_USER` already have local defaults. Export them too if your setup differs.
+
+### 4. Start the backend
+
+From the repository root:
+
+```bash
+mvn spring-boot:run
+```
+
+The API should use port `8080`. Flyway will apply the schema migration when the backend starts.
+
+### 5. Configure the frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+```
+
+Windows PowerShell:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+```
+
+Keep `VITE_API_BASE_URL=http://localhost:8080` when the backend uses its default port.
+
+### 6. Install frontend dependencies
+
+```bash
+npm install
+```
+
+### 7. Start the frontend
+
+```bash
+npm run dev
+```
+
+### 8. Open the application
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Expected local architecture
+
+```text
+Browser
+  |
+  | http://localhost:5173
+  v
+React + Vite
+  |
+  | HTTP /api/v1/task-analyses
+  v
+Spring Boot :8080
+  |
+  +----> OpenAI
+  |
+  +----> MySQL :3306
+```
+
+No OpenAI model is placed in Docker. The Spring Boot application calls the configured external provider.
 
 ## REST API
 
