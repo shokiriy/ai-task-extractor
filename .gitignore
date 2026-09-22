@@ -1,0 +1,11 @@
+target/
+.codex/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+hs_err_pid*
