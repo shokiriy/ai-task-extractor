@@ -1,3 +1,5 @@
+export { default } from './ChatApp';
+
 import { useEffect, useRef, useState } from 'react';
 import { getTaskAnalyses, getTaskAnalysis, analyzeTask } from './api/taskAnalysisApi';
 import { isAbortError, normalizeApiError, type UiError } from './api/apiError';
@@ -10,7 +12,7 @@ import type { PagedTaskAnalysisResponse, TaskAnalysisResponse } from './types/ta
 
 const HISTORY_PAGE_SIZE = 10;
 
-export default function App() {
+export function LegacyTaskApp() {
   const [taskText, setTaskText] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState<TaskAnalysisResponse | null>(null);
   const [history, setHistory] = useState<PagedTaskAnalysisResponse | null>(null);

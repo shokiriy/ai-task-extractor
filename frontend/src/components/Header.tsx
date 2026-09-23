@@ -6,10 +6,10 @@ export function Header() {
       </div>
       <div className="header-copy">
         <div className="title-row">
-          <h1>AI Task Extractor</h1>
-          <span className="tech-badge">Java + Spring AI</span>
+          <h1>Local AI Chat</h1>
+          <span className="tech-badge">Ollama &middot; qwen3.5:9b</span>
         </div>
-        <p>Turn natural-language tasks into structured data using Spring AI.</p>
+        <p>Private conversations powered by a model running on this computer.</p>
       </div>
     </header>
   );

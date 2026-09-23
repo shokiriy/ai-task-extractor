@@ -1,6 +1,8 @@
-# AI Task Extractor
+# Local AI Chat and Task Extractor
 
-`ai-task-extractor` is a small, production-style full-stack learning project for Java backend developers taking their first step into AI Engineering. A user submits an unstructured task through a React web UI, an LLM turns it into a strongly typed Java record, and the application stores both the source text and extracted fields in MySQL.
+O'zbek tilidagi bosqichma-bosqich o'rganish va ishga tushirish qo'llanmasi: [AI_ENGINEERING_QOLLANMA_UZ.md](AI_ENGINEERING_QOLLANMA_UZ.md)
+
+`ai-task-extractor` is a small full-stack Spring Boot and React project backed by a local Ollama model. The main web UI is a multi-turn chatbot; the original structured task-extraction REST API and MySQL persistence remain available.
 
 This repository intentionally stays small: one Spring Boot application, one focused React UI, one AI use case, and one database. It has no authentication, vector database, RAG, agent loop, or microservices.
 
@@ -47,11 +49,11 @@ Hallucination is when a model produces plausible but unsupported information. Th
 
 ### AI provider boundary
 
-Only `AiTaskExtractorService` knows that task extraction uses `ChatClient`. `TaskAnalysisService` depends on an extracted Java value, not OpenAI response classes. Provider exceptions are wrapped in `AiProcessingException`, so provider details and secrets do not leak through the REST API.
+Only the AI service layer knows that task extraction and chat use `ChatClient`. The application services do not depend on Ollama response classes. Provider exceptions are wrapped in `AiProcessingException`, so provider details do not leak through the REST API.
 
-### API key management
+### Local model configuration
 
-The OpenAI key comes from `OPENAI_API_KEY`. It is never stored in source code. `.env.example` contains placeholders, while `.env` and `.env.*` are ignored by Git.
+Ollama runs locally at `OLLAMA_BASE_URL` and the model is selected through `OLLAMA_MODEL`. No cloud API key is required. Local `.env` and `.env.*` files remain ignored by Git.
 
 ### Persistence of AI output
 
@@ -80,7 +82,7 @@ TaskAnalysisService
   |    Spring AI ChatClient
   |      |
   |      v
-  |    OpenAI
+  |    Ollama (local)
   |      |
   |      v
   |    Structured ExtractedTask
@@ -99,7 +101,7 @@ MySQL
 3. `TaskAnalysisController` passes valid text to `TaskAnalysisService`.
 4. `TaskAnalysisService` asks `AiTaskExtractorService` to extract a task.
 5. `TaskExtractionPrompt` supplies rules plus the current date, time, and configured zone so relative dates can be resolved.
-6. `ChatClient` sends the system and user messages to OpenAI with a schema derived from `ExtractedTask`.
+6. `ChatClient` sends the system and user messages to Ollama with a schema derived from `ExtractedTask`.
 7. Spring AI validates and maps the result into the Java record.
 8. Required semantic fields such as `title` and `description` receive a final application-level check.
 9. Only after successful extraction, the original text and structured values are saved in MySQL.
@@ -166,12 +168,12 @@ frontend/
 
 ## Web UI
 
-The `frontend/` application uses React 19.3, strict TypeScript, Vite 8, the native browser `fetch` API, and modern CSS. It provides one focused page for:
+The `frontend/` application uses React 19.3, strict TypeScript, Vite 8, the native browser `fetch` API, and modern CSS. Its main page provides:
 
-- submitting natural-language task text;
-- viewing the structured AI result;
-- browsing paginated analysis history;
-- loading a saved analysis through the detail endpoint;
+- a multi-turn local AI conversation;
+- a current-date-aware system instruction;
+- up to 20 recent messages of conversation context;
+- quick starter prompts and a clear-chat action;
 - displaying validation, network, AI provider, and server errors safely.
 
 During local development, Vite serves the frontend from `http://localhost:5173`, while Spring Boot serves the API from `http://localhost:8080`. These are different **origins** because their ports differ. Browsers normally block cross-origin requests unless the API explicitly allows them.
@@ -183,12 +185,12 @@ CORS (Cross-Origin Resource Sharing) is the backend policy that permits the fron
 
 ## Configuration
 
-Copy the placeholders from `.env.example` into your preferred environment-variable setup. Spring Boot does not automatically import a plain `.env` file; your shell, IDE run configuration, or another environment loader must export the values.
+Copy `.env.example` to `.env` and replace its placeholders. Spring Boot imports the root `.env` file as local properties, while operating-system environment variables can still override those values.
 
 | Variable | Required | Default | Purpose |
 |---|---:|---|---|
-| `OPENAI_API_KEY` | Yes | none | OpenAI credential; never commit it |
-| `OPENAI_MODEL` | No | `gpt-4o-mini` | Chat model used for extraction |
+| `OLLAMA_BASE_URL` | No | `http://localhost:11434` | Local Ollama HTTP API |
+| `OLLAMA_MODEL` | No | `qwen3.5:9b` | Local multilingual model used for chat and extraction |
 | `APP_TIME_ZONE` | No | `Asia/Tashkent` | Zone used to resolve relative deadlines |
 | `APP_CORS_ALLOWED_ORIGINS` | No | `http://localhost:5173` | Comma-separated frontend origins allowed to call `/api/**` |
 | `DB_HOST` | No | `localhost` | MySQL host |
@@ -208,11 +210,11 @@ The frontend has its own `frontend/.env.example` containing only:
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-Vite exposes `VITE_*` values to browser code, so never put an OpenAI key or another secret in the frontend environment file.
+Vite exposes `VITE_*` values to browser code, so never put secrets in the frontend environment file.
 
 ## Local Development
 
-These commands are for you to run manually. Prerequisites: Java 21, Maven, Docker, and a Node.js version supported by Vite 8 (`20.19+` or `22.12+`).
+These commands are for you to run manually. Prerequisites: Java 21, Maven, Docker, Ollama, and a Node.js version supported by Vite 8 (`20.19+` or `22.12+`).
 
 ### 1. Configure local MySQL values
 
@@ -236,31 +238,19 @@ Replace the placeholder database passwords in `.env`. Docker Compose automatical
 docker compose up -d
 ```
 
-This starts only MySQL. OpenAI is not part of Docker Compose.
+This starts only MySQL. Ollama runs directly on the host, not in Docker Compose.
 
-### 3. Configure the backend terminal
+### 3. Prepare Ollama and configure the backend
 
-Spring Boot does not automatically import the root `.env` file. Export the required values in the terminal where you will start Maven.
-
-macOS/Linux:
+Install Ollama, make sure its local service is running, and download the configured model:
 
 ```bash
-export OPENAI_API_KEY="your-real-openai-api-key"
-export DB_PASSWORD="the-same-DB_PASSWORD-used-in-.env"
-export APP_TIME_ZONE="Asia/Tashkent"
-export APP_CORS_ALLOWED_ORIGINS="http://localhost:5173"
+ollama pull qwen3.5:9b
 ```
 
-Windows PowerShell:
+The defaults in `.env.example` point Spring Boot to `http://localhost:11434` and select `qwen3.5:9b`.
 
-```powershell
-$env:OPENAI_API_KEY="your-real-openai-api-key"
-$env:DB_PASSWORD="the-same-DB_PASSWORD-used-in-.env"
-$env:APP_TIME_ZONE="Asia/Tashkent"
-$env:APP_CORS_ALLOWED_ORIGINS="http://localhost:5173"
-```
-
-`OPENAI_MODEL`, `DB_HOST`, `DB_PORT`, `DB_NAME`, and `DB_USER` already have local defaults. Export them too if your setup differs.
+If another MySQL server already uses port `3306`, choose another host port in `.env`, for example `DB_PORT=3308`. Docker Compose and Spring Boot will both use that value.
 
 ### 4. Start the backend
 
@@ -315,18 +305,32 @@ Browser
   v
 React + Vite
   |
-  | HTTP /api/v1/task-analyses
+  | HTTP /api/v1/chat
   v
 Spring Boot :8080
   |
-  +----> OpenAI
+  +----> Ollama :11434
   |
   +----> MySQL :3306
 ```
 
-No OpenAI model is placed in Docker. The Spring Boot application calls the configured external provider.
+The selected Ollama model runs locally. The Spring Boot application calls Ollama through its local HTTP API.
 
 ## REST API
+
+### Chat
+
+```bash
+curl --request POST 'http://localhost:8080/api/v1/chat' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "messages": [
+      {"role": "USER", "content": "Hello, what day is today?"}
+    ]
+  }'
+```
+
+Send previous `USER` and `ASSISTANT` messages in the same array to continue a conversation. The frontend keeps the latest 20 messages as context.
 
 ### Analyze and save a task
 
@@ -389,7 +393,7 @@ Provider failures and malformed structured responses return a safe `502` respons
 ## How structured output works
 
 1. Spring AI inspects `ExtractedTask` and derives a JSON schema from its record components and enum.
-2. `useProviderStructuredOutput()` sends that schema to OpenAI as an API-level response constraint instead of relying only on “please return JSON” prompt wording.
+2. `useProviderStructuredOutput()` sends that schema to Ollama as a response constraint instead of relying only on “please return JSON” prompt wording.
 3. `validateSchema()` checks the response against the schema.
 4. `.entity(ExtractedTask.class, ...)` converts the validated result into a Java record using Jackson.
 5. Application-level validation rejects a null result or blank required semantic fields.

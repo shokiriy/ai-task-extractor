@@ -5,7 +5,7 @@ export interface UiError {
   message: string;
 }
 
-export type ApiOperation = 'analysis' | 'history' | 'detail';
+export type ApiOperation = 'analysis' | 'history' | 'detail' | 'chat';
 
 export class ApiRequestError extends Error {
   constructor(
@@ -62,14 +62,14 @@ export function normalizeApiError(error: unknown, operation: ApiOperation): UiEr
 
     if (error.code === 'AI_PROVIDER_ERROR' || error.code === 'MALFORMED_AI_RESPONSE') {
       return {
-        title: 'AI processing failed',
-        message: `${error.message} Check the backend logs and OpenAI configuration.`,
+        title: 'Local AI could not answer',
+        message: `${error.message} Make sure Ollama is running and the configured model is installed.`,
       };
     }
 
     if (error.code === 'VALIDATION_ERROR') {
       return {
-        title: 'Check the task text',
+        title: operation === 'chat' ? 'Check the message' : 'Check the task text',
         message: error.message,
       };
     }
@@ -106,6 +106,10 @@ export function normalizeApiError(error: unknown, operation: ApiOperation): UiEr
     detail: {
       title: 'Could not load analysis details',
       message: 'Select the analysis again or try another record.',
+    },
+    chat: {
+      title: 'Could not send the message',
+      message: 'An unexpected error occurred while contacting the local AI model.',
     },
   };
 
